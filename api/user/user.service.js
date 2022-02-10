@@ -12,6 +12,7 @@ module.exports = {
   add,
   getByUID,
   getIsUserTaken,
+  getUserByFilter
 }
 
 async function query(filterBy = {}) {
@@ -19,11 +20,9 @@ async function query(filterBy = {}) {
   try {
     const collection = await dbService.getCollection('user')
     var users = await collection.find(criteria).toArray()
+    console.log('users',users)
     users = users.map((user) => {
       delete user.password
-      user.createdAt = ObjectId(user._id).getTimestamp()
-      // Returning fake fresh data
-      // user.createdAt = Date.now() - (1000 * 60 * 60 * 24 * 3) // 3 days ago
       return user
     })
     return users
@@ -33,20 +32,25 @@ async function query(filterBy = {}) {
   }
 }
 
+
+async function getUserByFilter({by,content}){
+    try{
+        let user
+        const collection = await dbService.getCollection('user')
+        if(by==='id') user = await collection.findOne({ _id: ObjectId(content) })
+        else user = await collection.findOne({[by]:content})
+        delete user.password
+        return user
+    }catch(err){
+
+    }
+}
+
 async function getById(userId) {
   try {
     const collection = await dbService.getCollection('user')
     const user = await collection.findOne({ _id: ObjectId(userId) })
     delete user.password
-
-    user.givenReviews = await reviewService.query({
-      byUserId: ObjectId(user._id),
-    })
-    user.givenReviews = user.givenReviews.map((review) => {
-      delete review.byUser
-      return review
-    })
-
     return user
   } catch (err) {
     logger.error(`while finding user ${userId}`, err)
@@ -57,6 +61,17 @@ async function getByUsername(username) {
   try {
     const collection = await dbService.getCollection('user')
     const user = await collection.findOne({ username })
+    return user
+  } catch (err) {
+    logger.error(`while finding user ${username}`, err)
+    throw err
+  }
+}
+
+async function getByUID(UID) {
+  try {
+    const collection = await dbService.getCollection('user')
+    const user = await collection.findOne({ UID })
     return user
   } catch (err) {
     logger.error(`while finding user ${username}`, err)
@@ -79,16 +94,43 @@ async function getIsUserTaken(username, UID) {
   }
 }
 
-async function getByUID(UID) {
-  try {
-    const collection = await dbService.getCollection('user')
-    const user = await collection.findOne({ UID })
-    return user
-  } catch (err) {
-    logger.error(`while finding user ${username}`, err)
-    throw err
-  }
+
+async function getDoctors(filterBy={}){
+    const criteria = _buildCriteria(filterBy)
+    try {
+      const collection = await dbService.getCollection('user')
+      var users = await collection.find(criteria).toArray()
+      users = users.map((user) => {
+        delete user.password
+       
+        return user.type==='doctor'
+      })
+      return users
+    } catch (err) {
+      logger.error('cannot find users', err)
+      throw err
+    }
 }
+
+
+async function getPatients(filterBy={}){
+    const criteria = _buildCriteria(filterBy)
+    try {
+      const collection = await dbService.getCollection('user')
+      var users = await collection.find(criteria).toArray()
+      users = users.map((user) => {
+        delete user.password
+       
+        return user.type==='doctor'
+      })
+      return users
+    } catch (err) {
+      logger.error('cannot find users', err)
+      throw err
+    }
+}
+
+
 
 async function remove(userId) {
   try {
@@ -104,9 +146,8 @@ async function update(user) {
   try {
     // peek only updatable fields!
     const userToSave = {
+        ...user,
       _id: ObjectId(user._id), // needed for the returnd obj
-      username: user.username,
-      fullname: user.fullname,
     }
     const collection = await dbService.getCollection('user')
     await collection.updateOne({ _id: userToSave._id }, { $set: userToSave })
@@ -146,20 +187,19 @@ async function add(user) {
 }
 
 function _buildCriteria(filterBy) {
-  const criteria = {}
+  let criteria = {}
   if (filterBy.txt) {
     const txtCriteria = { $regex: filterBy.txt, $options: 'i' }
     criteria.$or = [
-      {
-        username: txtCriteria,
-      },
       {
         fullname: txtCriteria,
       },
     ]
   }
-  if (filterBy.minBalance) {
-    criteria.balance = { $gte: filterBy.minBalance }
+  if(filterBy.type){
+    //   const typeCriteria = filterBy.type
+    //   criteria.type = {"type":typeCriteria}
+    criteria = {"type":filterBy.type}
   }
   return criteria
 }
