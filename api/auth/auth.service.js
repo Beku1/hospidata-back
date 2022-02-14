@@ -28,8 +28,10 @@ async function signup(username, password, UID, fullname,type,imgUrl) {
        let isTaken =  await userService.getIsUserTaken(username.toLowerCase(),UID)
         // const hash = await bcrypt.hash(password, saltRounds)
         // return userService.add({ username:username.toLowerCase(), password: hash, UID,fullname,type,imgUrl })
-        if(!isTaken)return userService.add({ username:username.toLowerCase(), password, UID,fullname,type,imgUrl })
+        if(!isTaken)await userService.add({ username:username.toLowerCase(), password, UID,fullname,type,imgUrl })
         else throw err('Username or UID is already taken')
+
+     
 
 
 }
